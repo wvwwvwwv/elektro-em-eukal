@@ -57,7 +57,9 @@ impl Sequencer for MonotonicU64 {
         let mut min = self.now(Acquire);
         for entry_list in &self.sharded_entry_list {
             while let Ok(Some(_)) = entry_list.0.pop_if(|e| e.ref_cnt.load(Relaxed) == 0) {}
-            min = entry_list.0.peek(|e| e.map_or(min, |t| t.instant.min(min)));
+            min = entry_list
+                .0
+                .peek_with(|e| e.map_or(min, |t| t.instant.min(min)));
         }
         min
     }

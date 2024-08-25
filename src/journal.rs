@@ -30,7 +30,7 @@ pub struct Journal<'d, 't, S: Sequencer, P: PersistenceLayer<S>> {
     log_buffer: Option<Arc<P::LogBuffer>>,
 
     /// [`Anchor`] may outlive the [`Journal`].
-    anchor: ebr::Arc<Anchor<S>>,
+    anchor: ebr::Shared<Anchor<S>>,
 }
 
 /// The type of journal identifiers.
@@ -47,7 +47,7 @@ pub type ID = u64;
 #[repr(align(16))]
 pub(super) struct Anchor<S: Sequencer> {
     /// Points to the key fields of the [`Transaction`].
-    transaction_anchor: ebr::Arc<TransactionAnchor<S>>,
+    transaction_anchor: ebr::Shared<TransactionAnchor<S>>,
 
     /// The time point when the [`Journal`] was created.
     creation_instant: Option<NonZeroU32>,
@@ -69,7 +69,7 @@ pub(super) struct Anchor<S: Sequencer> {
     wake_up_others: AtomicBool,
 
     /// [`Anchor`] itself is formed as a linked list of [`Anchor`] by the [`Transaction`].
-    next: ebr::AtomicArc<Anchor<S>>,
+    next: ebr::AtomicShared<Anchor<S>>,
 }
 
 /// The result of the current access permission request.
@@ -108,7 +108,7 @@ pub(super) struct AwaitResponse<'d> {
 #[derive(Debug)]
 pub(super) struct AwaitEOT<'d, S: Sequencer> {
     /// The transaction to be committed or rolled back.
-    transaction_anchor: ebr::Arc<TransactionAnchor<S>>,
+    transaction_anchor: ebr::Shared<TransactionAnchor<S>>,
 
     /// The associated [`TaskProcessor`] that handles end-of-transaction messages.
     task_processor: &'d TaskProcessor,
@@ -288,19 +288,19 @@ impl<'d, 't, S: Sequencer, P: PersistenceLayer<S>> Journal<'d, 't, S, P> {
     }
 
     /// Returns a reference to its [`Anchor`].
-    pub(super) fn anchor(&self) -> &ebr::Arc<Anchor<S>> {
+    pub(super) fn anchor(&self) -> &ebr::Shared<Anchor<S>> {
         &self.anchor
     }
 
     /// Creates a new [`Journal`].
     pub(super) fn new(
         transaction: &'t Transaction<'d, S, P>,
-        transaction_anchor: ebr::Arc<TransactionAnchor<S>>,
+        transaction_anchor: ebr::Shared<TransactionAnchor<S>>,
     ) -> Journal<'d, 't, S, P> {
         Journal {
             transaction,
             log_buffer: None,
-            anchor: ebr::Arc::new(Anchor::new(transaction_anchor, transaction.now())),
+            anchor: ebr::Shared::new(Anchor::new(transaction_anchor, transaction.now())),
         }
     }
 
@@ -485,9 +485,9 @@ impl<S: Sequencer> Anchor<S> {
     /// Sets the next [`Anchor`].
     pub(super) fn set_next(
         &self,
-        next: Option<ebr::Arc<Anchor<S>>>,
+        next: Option<ebr::Shared<Anchor<S>>>,
         order: Ordering,
-    ) -> (Option<ebr::Arc<Anchor<S>>>, NonZeroU32) {
+    ) -> (Option<ebr::Shared<Anchor<S>>>, NonZeroU32) {
         let new_submit_instant = next.as_ref().and_then(|a| a.submit_instant()).map_or(
             // Safety: `1` is definitely non-zero.
             unsafe { NonZeroU32::new_unchecked(1) },
@@ -533,7 +533,7 @@ impl<S: Sequencer> Anchor<S> {
 
     /// Creates a new [`Anchor`].
     pub(super) fn new(
-        transaction_anchor: ebr::Arc<TransactionAnchor<S>>,
+        transaction_anchor: ebr::Shared<TransactionAnchor<S>>,
         creation_instant: Option<NonZeroU32>,
     ) -> Anchor<S> {
         Anchor {
@@ -543,7 +543,7 @@ impl<S: Sequencer> Anchor<S> {
             submitted: AtomicBool::new(false),
             rolled_back: AtomicBool::new(false),
             wake_up_others: AtomicBool::new(false),
-            next: ebr::AtomicArc::null(),
+            next: ebr::AtomicShared::null(),
         }
     }
 

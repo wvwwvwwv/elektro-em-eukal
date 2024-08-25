@@ -15,12 +15,15 @@ use std::sync::atomic::Ordering::Relaxed;
 #[derive(Debug)]
 pub struct DatabaseHeader {
     /// Database version.
+    #[allow(dead_code)]
     pub version: u64,
 
     /// The log page link head.
+    #[allow(dead_code)]
     pub log_head: u64,
 
     /// The container directory page link head.
+    #[allow(dead_code)]
     pub container_directory_head: u64,
 
     /// The free page set.

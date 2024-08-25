@@ -8,21 +8,21 @@ version = "0.2.0"
 authors = ["wvwwvwwv <wvwwvwwv@me.com>"]
 edition = "2021"
 readme = "README.md"
-repository = "https://github.com/SAP/transactional-storage-framework"
+repository = "https://github.com/wvwwvwwv/elektro-em-eukal"
 license = "Apache-2.0"
 categories = ["asynchronous", "concurrency", "database-implementations"]
 keywords = ["async", "concurrent", "database"]
 
 [dependencies]
 libc = "0.2"
-scc = "1.9"
+scc = "2.1"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_futures"] }
 futures = "0.3"
-proptest = "1.2"
+proptest = "1.5"
 static_assertions = "1.1"
-tokio = { version = "1.2", features = ["full"] }
+tokio = { version = "1.39", features = ["full"] }
 
 [[bench]]
 name = "access_controller"

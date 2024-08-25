@@ -142,7 +142,7 @@ impl TaskProcessor {
             monitored_containers.retain(|name| {
                 if let Some(container) = thread_local_data
                     .kernel
-                    .container(name.as_str(), &ebr::Barrier::new())
+                    .container(name.as_str(), &ebr::Guard::new())
                 {
                     let oldest = thread_local_data.kernel.sequencer().min(Acquire);
                     let versioned_record_iter = container.iter_versioned_records();

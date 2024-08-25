@@ -4,4 +4,5 @@
 
 /// [`Telemetry`] provides statistics data and aggregated views on the database system internals.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Telemetry;

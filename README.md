@@ -4,10 +4,10 @@ SPDX-FileCopyrightText: 2021 Changgyoo Park <wvwwvwwv@me.com>
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# Transactional Storage Framework
+# E<sup>3</sup> Database System
 
-[![REUSE status](https://api.reuse.software/badge/github.com/SAP/transactional-storage-framework)](https://api.reuse.software/info/github.com/SAP/transactional-storage-framework)
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/SAP/transactional-storage-framework/sap_tsf.yml?branch=main)
+[![REUSE status](https://api.reuse.software/badge/github.com/wvwwvwwv/elektro-em-eukal)](https://api.reuse.software/info/github.com/wvwwvwwv/elektro-em-eukal)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/wvwwvwwv/elektro-em-eukal/sap_tsf.yml?branch=main)
 
 **The project is currently work-in-progress.**
 **The whole code base is currently undergoing extensive renovation.**

@@ -42,7 +42,7 @@ pub struct Transaction<'d, S: Sequencer, P: PersistenceLayer<S>> {
     ///
     /// [`Transaction`] assigns each submitted [`Journal`] a logical time point value in increasing
     /// order.
-    journal_strand: ebr::AtomicArc<JournalAnchor<S>>,
+    journal_strand: ebr::AtomicShared<JournalAnchor<S>>,
 
     /// The identifier of the [`Transaction`] as part of a distributed transaction.
     ///
@@ -52,7 +52,7 @@ pub struct Transaction<'d, S: Sequencer, P: PersistenceLayer<S>> {
     /// A piece of data that is shared between [`Journal`] and [`Transaction`].
     ///
     /// It outlives the [`Transaction`], and it is dropped when no database objects refer to it.
-    anchor: ebr::Arc<Anchor<S>>,
+    anchor: ebr::Shared<Anchor<S>>,
 }
 
 /// The type of transaction identifiers.
@@ -116,13 +116,13 @@ pub struct Playback<'d, S: Sequencer, P: PersistenceLayer<S>> {
     database: &'d Database<S, P>,
 
     /// Journal anchor map.
-    journal_anchor_map: HashMap<u64, ebr::Arc<JournalAnchor<S>>>,
+    journal_anchor_map: HashMap<u64, ebr::Shared<JournalAnchor<S>>>,
 
     /// The changes made by the transaction to play back.
-    submitted_journal_anchors: BTreeMap<u32, ebr::Arc<JournalAnchor<S>>>,
+    submitted_journal_anchors: BTreeMap<u32, ebr::Shared<JournalAnchor<S>>>,
 
     /// Journal anchors beyond `u32::MAX`.
-    submitted_unbounded_journal_anchors: Vec<ebr::Arc<JournalAnchor<S>>>,
+    submitted_unbounded_journal_anchors: Vec<ebr::Shared<JournalAnchor<S>>>,
 
     /// The identifier of the [`Transaction`] as part of a distributed transaction.
     ///
@@ -132,7 +132,7 @@ pub struct Playback<'d, S: Sequencer, P: PersistenceLayer<S>> {
     /// A piece of data that is shared between [`Journal`] and [`Transaction`].
     ///
     /// It outlives the [`Transaction`], and it is dropped when no database objects refer to it.
-    anchor: ebr::Arc<Anchor<S>>,
+    anchor: ebr::Shared<Anchor<S>>,
 }
 
 /// [Anchor] contains data that is required to outlive the [Transaction] instance.
@@ -283,7 +283,7 @@ impl<'d, S: Sequencer, P: PersistenceLayer<S>> Transaction<'d, S, P> {
     #[inline]
     pub fn now(&self) -> Option<NonZeroU32> {
         self.journal_strand
-            .load(Acquire, &ebr::Barrier::new())
+            .load(Acquire, &ebr::Guard::new())
             .as_ref()
             .and_then(|j| j.submit_instant().map(|i| i.min(MAX_TRANSACTION_INSTANT)))
     }
@@ -454,9 +454,9 @@ impl<'d, S: Sequencer, P: PersistenceLayer<S>> Transaction<'d, S, P> {
             database,
             durable_flush_epoch: AtomicU64::new(0),
             eot_log_buffer: Some(Arc::default()),
-            journal_strand: ebr::AtomicArc::null(),
+            journal_strand: ebr::AtomicShared::null(),
             xid: None,
-            anchor: ebr::Arc::new(Anchor::new()),
+            anchor: ebr::Shared::new(Anchor::new()),
         }
     }
 
@@ -473,13 +473,13 @@ impl<'d, S: Sequencer, P: PersistenceLayer<S>> Transaction<'d, S, P> {
     /// Submits a [`Journal`].
     pub(super) fn submit_journal(
         &self,
-        anchor: &ebr::Arc<JournalAnchor<S>>,
+        anchor: &ebr::Shared<JournalAnchor<S>>,
         log_buffer: Option<Arc<P::LogBuffer>>,
     ) -> NonZeroU32 {
-        let barrier = ebr::Barrier::new();
+        let barrier = ebr::Guard::new();
         let mut current = self.journal_strand.load(Relaxed, &barrier);
         loop {
-            let submit_instant = anchor.set_next(current.get_arc(), Relaxed).1;
+            let submit_instant = anchor.set_next(current.get_shared(), Relaxed).1;
             match self.journal_strand.compare_exchange(
                 current,
                 (Some(anchor.clone()), ebr::Tag::None),
@@ -686,12 +686,15 @@ impl<'d, S: Sequencer, P: PersistenceLayer<S>> Playback<'d, S, P> {
             submitted_journal_anchors: BTreeMap::default(),
             submitted_unbounded_journal_anchors: Vec::default(),
             xid: None,
-            anchor: ebr::Arc::new(Anchor::new()),
+            anchor: ebr::Shared::new(Anchor::new()),
         }
     }
 
     /// Gets or create a [`JournalAnchor`] associated with the specified identifier.
-    pub(crate) fn get_or_create_journal_anchor(&mut self, id: u64) -> ebr::Arc<JournalAnchor<S>> {
+    pub(crate) fn get_or_create_journal_anchor(
+        &mut self,
+        id: u64,
+    ) -> ebr::Shared<JournalAnchor<S>> {
         match self.journal_anchor_map.entry(id) {
             hash_map::Entry::Occupied(o) => o.get().clone(),
             hash_map::Entry::Vacant(v) => {
@@ -705,8 +708,11 @@ impl<'d, S: Sequencer, P: PersistenceLayer<S>> Playback<'d, S, P> {
                 } else {
                     Some(MAX_TRANSACTION_INSTANT)
                 };
-                v.insert(ebr::Arc::new(JournalAnchor::new(self.anchor.clone(), now)))
-                    .clone()
+                v.insert(ebr::Shared::new(JournalAnchor::new(
+                    self.anchor.clone(),
+                    now,
+                )))
+                .clone()
             }
         }
     }

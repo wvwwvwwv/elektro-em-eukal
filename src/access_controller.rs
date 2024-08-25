@@ -96,7 +96,7 @@ pub struct AccessController<S: Sequencer> {
 #[derive(Debug)]
 pub(super) struct Owner<S: Sequencer> {
     /// The journal is directly pointed to by [`Owner`].
-    anchor: ebr::Arc<JournalAnchor<S>>,
+    anchor: ebr::Shared<JournalAnchor<S>>,
 }
 
 /// Possible states of a database object.
@@ -710,7 +710,7 @@ impl<S: Sequencer> AccessController<S> {
     pub(crate) fn playback_create_sync(
         &self,
         object_id: u64,
-        journal_anchor: &ebr::Arc<JournalAnchor<S>>,
+        journal_anchor: &ebr::Shared<JournalAnchor<S>>,
     ) {
         match self.table.entry(object_id) {
             MapEntry::Occupied(mut o) => {
@@ -732,7 +732,7 @@ impl<S: Sequencer> AccessController<S> {
     pub(crate) fn playback_delete_sync(
         &self,
         object_id: u64,
-        journal_anchor: &ebr::Arc<JournalAnchor<S>>,
+        journal_anchor: &ebr::Shared<JournalAnchor<S>>,
     ) {
         match self.table.entry(object_id) {
             MapEntry::Occupied(mut o) => {
@@ -1041,7 +1041,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_create(
         object_state: &mut ObjectState<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         object_state.prepare_ownership_transfer();
@@ -1097,7 +1097,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_share(
         object_state: &mut ObjectState<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         loop {
@@ -1175,7 +1175,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_lock(
         object_state: &mut ObjectState<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         loop {
@@ -1262,7 +1262,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_delete(
         object_state: &mut ObjectState<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         loop {
@@ -1351,7 +1351,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_share_exclusively_owned(
         ownership: &mut Ownership<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         let (owner, is_created, is_deleted) = match ownership {
@@ -1412,7 +1412,7 @@ impl<S: Sequencer> AccessController<S> {
     /// out after waiting, or `(false, false)` if the operation needs to be retried.
     fn try_share_exclusive_awaitable(
         ownership: &mut Ownership<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<(bool, bool), Error> {
         let (exclusive_awaitable, is_created, is_deleted) =
@@ -1476,7 +1476,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_lock_exclusively_owned(
         ownership: &mut Ownership<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         let (owner, is_created, is_deleted) = match ownership {
@@ -1538,7 +1538,7 @@ impl<S: Sequencer> AccessController<S> {
     /// out after waiting, or `(false, false)` if the operation needs to be retried.
     fn try_lock_exclusive_awaitable(
         ownership: &mut Ownership<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<(bool, bool), Error> {
         let (exclusive_awaitable, is_created, is_deleted) =
@@ -1602,7 +1602,7 @@ impl<S: Sequencer> AccessController<S> {
     /// Returns `Ok(None)` if the result will be out after waiting.
     fn try_delete_exclusively_owned(
         ownership: &mut Ownership<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<Option<bool>, Error> {
         let (owner, is_created, is_deleted) = match ownership {
@@ -1676,7 +1676,7 @@ impl<S: Sequencer> AccessController<S> {
     /// out after waiting, or `(false, false)` if the operation needs to be retried.
     fn try_delete_exclusive_awaitable(
         ownership: &mut Ownership<S>,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
         deadline: Option<Instant>,
     ) -> Result<(bool, bool), Error> {
         let (exclusive_awaitable, is_created, is_deleted) =
@@ -1786,7 +1786,7 @@ impl<S: Sequencer> AccessController<S> {
 
 impl<S: Sequencer> Owner<S> {
     /// Creates a new [`Owner`].
-    fn new(anchor: &ebr::Arc<JournalAnchor<S>>) -> Owner<S> {
+    fn new(anchor: &ebr::Shared<JournalAnchor<S>>) -> Owner<S> {
         Owner {
             anchor: anchor.clone(),
         }
@@ -2016,7 +2016,7 @@ impl<S: Sequencer> SharedAwaitable<S> {
     /// Checks if the specified owner is linearizable with all the owners in the owner set.
     fn try_promote_to_exclusive(
         &mut self,
-        new_owner: &ebr::Arc<JournalAnchor<S>>,
+        new_owner: &ebr::Shared<JournalAnchor<S>>,
     ) -> Option<Box<ExclusiveAwaitable<S>>> {
         if self.owner_set.iter().any(|o| {
             // Delete the entry if the owner definitely does not hold the shared ownership.

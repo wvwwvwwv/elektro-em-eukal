@@ -37,7 +37,7 @@ pub(super) struct Kernel<S: Sequencer, P: PersistenceLayer<S>> {
     sequencer: S,
 
     /// The container map.
-    container_map: HashIndex<String, ebr::Arc<Container<S, P>>>,
+    container_map: HashIndex<String, ebr::Shared<Container<S, P>>>,
 
     /// The database access controller.
     access_controller: AccessController<S>,
@@ -195,9 +195,9 @@ impl<S: Sequencer, P: PersistenceLayer<S>> Database<S, P> {
         metadata: Metadata,
         _journal: &'j mut Journal<'d, 't, S, P>,
         _deadline: Option<Instant>,
-    ) -> Result<ebr::Arc<Container<S, P>>, Error> {
+    ) -> Result<ebr::Shared<Container<S, P>>, Error> {
         let _: &AccessController<S> = &self.kernel.access_controller;
-        let container = ebr::Arc::new(Container::new(metadata));
+        let container = ebr::Shared::new(Container::new(metadata));
         match self
             .kernel
             .container_map
@@ -244,7 +244,7 @@ impl<S: Sequencer, P: PersistenceLayer<S>> Database<S, P> {
         _journal: &'j mut Journal<'d, 't, S, P>,
         _deadline: Option<Instant>,
     ) -> Result<(), Error> {
-        if let Some(container) = self.kernel.container_map.read(name, |_, c| c.clone()) {
+        if let Some(container) = self.kernel.container_map.peek_with(name, |_, c| c.clone()) {
             if self
                 .kernel
                 .container_map
@@ -291,7 +291,7 @@ impl<S: Sequencer, P: PersistenceLayer<S>> Database<S, P> {
         name: &str,
         _snapshot: &'r Snapshot<'d, 't, 'j, S>,
     ) -> Option<&'r Container<S, P>> {
-        self.kernel.container_map.read(name, |_, c|
+        self.kernel.container_map.peek_with(name, |_, c|
             // Safety: `snapshot` is the proof that the returned reference stays valid at least for
             // the lifetime of `snapshot`; even though the container is dropped, the data remains
             // until it is garbage collected.
@@ -403,10 +403,9 @@ impl<S: Sequencer, P: PersistenceLayer<S>> Kernel<S, P> {
     pub(super) fn container<'b>(
         &self,
         name: &str,
-        barrier: &'b ebr::Barrier,
+        barrier: &'b ebr::Guard,
     ) -> Option<&'b Container<S, P>> {
-        self.container_map
-            .read_with(name, |_, c| c.as_ref(), barrier)
+        self.container_map.peek(name, barrier).map(|c| c.as_ref())
     }
 
     /// Returns a reference to its [`AccessController`].
